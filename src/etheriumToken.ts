@@ -4,6 +4,13 @@ export const EtheriumTokens = [
     name: '0.5X Long Algorand',
     symbol: 'algohalf',
     platform: 'ethereum',
+    address: '0x0000000000000000000000000000000000000000',
+  },
+  {
+    id: '0-5x-long-algorand-token',
+    name: '0.5X Long Algorand',
+    symbol: 'algohalf',
+    platform: 'ethereum',
     address: '',
   },
   {

@@ -1,7 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { EtheriumTokens } from './etheriumToken';
 import { AddressBalanceMap } from 'eth-balance-checker';
-import * as Ethers from 'ethers';
 import * as BN from 'bn.js';
 @Injectable()
 export class AppService {
@@ -9,7 +8,7 @@ export class AppService {
     const promises: Array<Promise<BN>> = [];
     const Web3 = require('web3');
     const provider =
-      'https://mainnet.infura.io/v3/b509a32f1d2a412d958d135660d62b8a';
+      'https://mainnet.infura.io/v3/7c992abc3a114e198762af2845725754';
 
     const Web3Client = new Web3(new Web3.providers.HttpProvider(provider));
 
@@ -31,23 +30,29 @@ export class AppService {
       }
     });
     const tokenAddresses = tokenObj.map((i) => i.address);
-    console.log('tokenAddresses', tokenAddresses);
+    // console.log('tokenAddresses', tokenAddresses);
     const address = ['0x742d35cc6634c0532925a3b844bc454e4438f44e'];
 
     const data = address.map((address) => {
       return {
         [address]: tokenAddresses.map(async (tokenAddr) => {
-          const eth = Ethers.getDefaultProvider();
-          const contract: any = new Web3Client.eth.Contract(
-            tokenAbi,
-            tokenAddr,
-          );
-          promises.push(
-            contract.methods
-              .balanceOf(address)
-              .call()
-              .catch(() => new BN(0)),
-          );
+          if (tokenAddr === '0x0000000000000000000000000000000000000000') {
+            promises.push(Web3Client.eth.getBalance(address) as any);
+          } else {
+            const contract: any = new Web3Client.eth.Contract(
+              tokenAbi,
+              tokenAddr,
+            );
+            promises.push(
+              contract.methods
+                .balanceOf(address)
+                .call()
+                .catch((err) => {
+                  console.log('err', err);
+                  return new BN(0);
+                }),
+            );
+          }
         }),
       };
     });
@@ -59,10 +64,12 @@ export class AppService {
         tokenAddresses.forEach((tokenAddr, tokenIdx) => {
           const balance =
             responses[addressIdx * tokenAddresses.length + tokenIdx];
-          balances[address][tokenAddr] = balance.toString();
+          if (balance.toString() !== '0') {
+            balances[address][tokenAddr] = balance.toString();
+          }
         });
       });
-      console.log(balances);
+      // console.log(balances);
       return balances;
     });
 
@@ -70,7 +77,5 @@ export class AppService {
     //   '0xbFe35Cfb1bC98F56709595633E26F39eA2725fA8',
     // );
     // const format = Web3Client.utils.fromWei(result);
-
-    console.log('abc', data);
   }
 }
