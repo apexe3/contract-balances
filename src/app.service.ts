@@ -1,70 +1,77 @@
 import { Injectable } from '@nestjs/common';
-import { InjectRedis } from '@nestjs-modules/ioredis';
-import Redis from 'ioredis';
-import * as moment from 'moment';
-
+import { EtheriumTokens } from './etheriumToken';
+import { AddressBalanceMap } from 'eth-balance-checker';
+import * as Ethers from 'ethers';
+import * as BN from 'bn.js';
 @Injectable()
 export class AppService {
-  constructor(@InjectRedis() private redis: Redis) {}
-  async getEquityPrices(): Promise<any> {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const yFinance = require('yahoo-finance');
-    const today = moment().format('YYYY-MM-DD');
-    const tradeDaysAgo = 1825;
-    const daysAgo = moment()
-      .subtract(tradeDaysAgo, 'days')
-      .format('YYYY-MM-DD');
+  async getBalances(): Promise<any> {
+    const promises: Array<Promise<BN>> = [];
+    const Web3 = require('web3');
+    const provider =
+      'https://mainnet.infura.io/v3/b509a32f1d2a412d958d135660d62b8a';
 
-    const quotes = await yFinance.quote({
-      symbols:
-        process.env.EQ_SYMBOLS && process.env.EQ_SYMBOLS.includes(',')
-          ? process.env.EQ_SYMBOLS.split(',').slice(1, 10)
-          : [process.env.EQ_SYMBOLS],
-    });
-    const historicalResult = await yFinance.historical({
-      symbols:
-        process.env.EQ_SYMBOLS && process.env.EQ_SYMBOLS.includes(',')
-          ? process.env.EQ_SYMBOLS.split(',').slice(1, 10)
-          : [process.env.EQ_SYMBOLS], // query
-      from: daysAgo,
-      to: today,
-    });
+    const Web3Client = new Web3(new Web3.providers.HttpProvider(provider));
 
-    const allHistoricalResult = {};
-    Object.values(historicalResult)?.forEach((history: any, index: any) => {
-      allHistoricalResult[Object.keys(historicalResult)[index]] = history.map(
-        (i: any) => {
-          this.redis.sadd(
-            `HistoricalYahooData:${quotes[i.symbol].price.exchange}_${
-              quotes[i.symbol].price.symbol
-            }_${quotes[i.symbol].price.currency}_spot_tick_historical`,
-            JSON.stringify({
-              open: i.open,
-              close: i.close,
-              high: i.high,
-              low: i.low,
-              volume: i.volume,
-              venue: quotes[i.symbol].price.exchange,
-              venueName: quotes[i.symbol].price.exchangeName,
-              base: quotes[i.symbol].price.symbol,
-              quote: quotes[i.symbol].price.currency,
-            }),
+    const tokenAbi = [
+      {
+        constant: true,
+        inputs: [{ name: '_owner', type: 'address' }],
+        name: 'balanceOf',
+        outputs: [{ name: 'balance', type: 'uint256' }],
+        type: 'function',
+      },
+    ];
+
+    const tokenObj = EtheriumTokens.filter((t) => {
+      if (t.address) {
+        return true;
+      } else {
+        return false;
+      }
+    });
+    const tokenAddresses = tokenObj.map((i) => i.address);
+    console.log('tokenAddresses', tokenAddresses);
+    const address = ['0x742d35cc6634c0532925a3b844bc454e4438f44e'];
+
+    const data = address.map((address) => {
+      return {
+        [address]: tokenAddresses.map(async (tokenAddr) => {
+          const eth = Ethers.getDefaultProvider();
+          const contract: any = new Web3Client.eth.Contract(
+            tokenAbi,
+            tokenAddr,
           );
-          return {
-            open: i.open,
-            close: i.close,
-            high: i.high,
-            low: i.low,
-            volume: i.volume,
-            venue: quotes[i.symbol].price.exchange,
-            venueName: quotes[i.symbol].price.exchangeName,
-            base: quotes[i.symbol].price.symbol,
-            quote: quotes[i.symbol].price.currency,
-          };
-        },
-      );
+
+          promises.push(
+            contract.methods
+              .balanceOf(address)
+              .call()
+              .catch(() => new BN(0)),
+          );
+        }),
+      };
     });
 
-    return allHistoricalResult;
+    return Promise.all(promises).then((responses) => {
+      const balances: AddressBalanceMap = {};
+      address.forEach((address, addressIdx) => {
+        balances[address] = {};
+        tokenAddresses.forEach((tokenAddr, tokenIdx) => {
+          const balance =
+            responses[addressIdx * tokenAddresses.length + tokenIdx];
+          balances[address][tokenAddr] = balance.toString();
+        });
+      });
+      console.log(balances);
+      return balances;
+    });
+
+    // const result = await Web3Client.eth.getBalance(
+    //   '0xbFe35Cfb1bC98F56709595633E26F39eA2725fA8',
+    // );
+    // const format = Web3Client.utils.fromWei(result);
+
+    console.log('abc', data);
   }
 }

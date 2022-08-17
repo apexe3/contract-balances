@@ -1,12 +1,12 @@
 import { Controller, Get } from '@nestjs/common';
 import { AppService } from './app.service';
 
-@Controller('yahoo')
+@Controller()
 export class AppController {
   constructor(private readonly appService: AppService) {}
 
-  @Get('/history')
-  getEquityPrices() {
-    return this.appService.getEquityPrices();
+  @Get()
+  getEquityPrices(): Promise<any> {
+    return this.appService.getBalances();
   }
 }
