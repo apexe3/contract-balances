@@ -42,7 +42,6 @@ export class AppService {
             tokenAbi,
             tokenAddr,
           );
-
           promises.push(
             contract.methods
               .balanceOf(address)
