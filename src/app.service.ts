@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { EtheriumTokens } from './etheriumToken';
 import { AddressBalanceMap } from 'eth-balance-checker';
 import * as BN from 'bn.js';
+import { getAddressesBalances as getWeb3Balances } from 'eth-balance-checker/lib/web3';
 @Injectable()
 export class AppService {
   async getBalances(): Promise<any> {
@@ -33,45 +34,49 @@ export class AppService {
     // console.log('tokenAddresses', tokenAddresses);
     const address = ['0x742d35cc6634c0532925a3b844bc454e4438f44e'];
 
-    const data = address.map((address) => {
-      return {
-        [address]: tokenAddresses.map(async (tokenAddr) => {
-          if (tokenAddr === '0x0000000000000000000000000000000000000000') {
-            promises.push(Web3Client.eth.getBalance(address) as any);
-          } else {
-            const contract: any = new Web3Client.eth.Contract(
-              tokenAbi,
-              tokenAddr,
-            );
-            promises.push(
-              contract.methods
-                .balanceOf(address)
-                .call()
-                .catch((err) => {
-                  console.log('err', err);
-                  return new BN(0);
-                }),
-            );
-          }
-        }),
-      };
-    });
+    const balances = await getWeb3Balances(Web3Client, address, tokenAddresses);
 
-    return Promise.all(promises).then((responses) => {
-      const balances: AddressBalanceMap = {};
-      address.forEach((address, addressIdx) => {
-        balances[address] = {};
-        tokenAddresses.forEach((tokenAddr, tokenIdx) => {
-          const balance =
-            responses[addressIdx * tokenAddresses.length + tokenIdx];
-          if (balance.toString() !== '0') {
-            balances[address][tokenAddr] = balance.toString();
-          }
-        });
-      });
-      // console.log(balances);
-      return balances;
-    });
+    return balances;
+
+    // const data = address.map((address) => {
+    //   return {
+    //     [address]: tokenAddresses.map(async (tokenAddr) => {
+    //       if (tokenAddr === '0x0000000000000000000000000000000000000000') {
+    //         promises.push(Web3Client.eth.getBalance(address) as any);
+    //       } else {
+    //         const contract: any = new Web3Client.eth.Contract(
+    //           tokenAbi,
+    //           tokenAddr,
+    //         );
+    //         promises.push(
+    //           contract.methods
+    //             .balanceOf(address)
+    //             .call()
+    //             .catch((err) => {
+    //               console.log('err', err);
+    //               return new BN(0);
+    //             }),
+    //         );
+    //       }
+    //     }),
+    //   };
+    // });
+
+    // return Promise.all(promises).then((responses) => {
+    //   const balances: AddressBalanceMap = {};
+    //   address.forEach((address, addressIdx) => {
+    //     balances[address] = {};
+    //     tokenAddresses.forEach((tokenAddr, tokenIdx) => {
+    //       const balance =
+    //         responses[addressIdx * tokenAddresses.length + tokenIdx];
+    //       if (balance.toString() !== '0') {
+    //         balances[address][tokenAddr] = balance.toString();
+    //       }
+    //     });
+    //   });
+    //   // console.log(balances);
+    //   return balances;
+    // });
 
     // const result = await Web3Client.eth.getBalance(
     //   '0xbFe35Cfb1bC98F56709595633E26F39eA2725fA8',
